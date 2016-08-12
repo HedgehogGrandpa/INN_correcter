@@ -1,6 +1,8 @@
 # -*- coding: cp1251 -*-
 import argparse
 import VATFormatter
+import sys
+from PyQt5.QtWidgets import QApplication, QWidget
 
 
 def argument_parse():
@@ -11,9 +13,9 @@ def argument_parse():
                         help='Имя файла .xls или .xlsx формата с информацией об организациях')
     parser.add_argument('outputFileName', nargs='?', default='',
                         help='имя выходного файла')
-    parser.add_argument('--i', metavar='INN', dest='inn', action='store', nargs='*', type=int, required=True,
+    parser.add_argument('-i', metavar='INN', dest='inn', action='store', nargs='*', type=int, required=True,
                         help='Номера столбцов, в которых есть ИНН')
-    parser.add_argument('--k', metavar='KPP', dest='kpp', action='store', nargs='*', type=int,
+    parser.add_argument('-k', metavar='KPP', dest='kpp', action='store', nargs='*', type=int,
                         help='Номера столбцов, в которых есть КПП.\n'
                              'Номера столбцов указывать соответствующие номерам столбцов с ИНН')
 
@@ -22,10 +24,15 @@ def argument_parse():
 
 
 def main():
+    app = QApplication([])
+    wid = QWidget()
+    wid.resize(300, 300)
+    wid.show()
     filename, output_file, inns, kpps = argument_parse()
     print(filename, output_file, inns, kpps)
     formatter = VATFormatter.VATFormatter(filename, inns, kpps, output_file)
     formatter.correct_type_of_vat()
+    sys.exit(app.exec_())
 
 
 if __name__ == '__main__':

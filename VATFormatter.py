@@ -30,12 +30,14 @@ class VATFormatter:
             self._sheet = xlrd.open_workbook(self._input_file_name).sheet_by_index(0)
             self._work_book = xlsxwriter.Workbook(self._output_file_name)
             self._outsheet = self._work_book.add_worksheet('Corrected')
+            print(self._inn_kpp)
         except Exception as e:
             print(e)
         self._cur_row_num = 0
         self._cur_in_row = None
         self._cur_out_row = None
 
+    # проверка корректности ИНН
     @staticmethod
     def check_inn(inn):
         if len(inn) not in (10, 12):
@@ -52,6 +54,7 @@ class VATFormatter:
         else:
             return inn[-2:] == inn_csum(inn[:-2]) + inn_csum(inn[:-1])
 
+    # сформировать новые инн и кпп
     def reformat_cells_kpp_info(self, inn, kpp):
         kpp_value = self._cur_in_row[kpp].value
         inn_value = self._cur_in_row[inn].value
@@ -67,25 +70,36 @@ class VATFormatter:
 
         return new_inn, new_kpp
 
+    # сформировать только инн. Не знаем где искать кпп
     def _reformat_cells_kpp_none(self, inn):
         inn_value = str(int(self._cur_in_row[inn].value))
 
         l = len(inn_value)
         if l in (9, 11):
-            return '0{}'.format(inn_value)
+            return '0{}'.format(inn_value), ''
         else:
-            return inn_value
+            return inn_value, ''
 
+    # изменить типы и значения по всей таблице
     def correct_type_of_vat(self):
         try:
-            for row in self._sheet.get_rows():
-                self.correct_row(row)
-                self.write_corected_row()
-            self._work_book.close()
+            for self._cur_in_row in self._sheet.get_rows():
+                try:
+                    self.correct_row()
+                    self.write_corected_row(False)
+                except ValueError as e:
+                    print('{}'.format(e))
+                    self.write_corected_row(True)
         except PermissionError as e:
             print('{}'.format(e))
+        except Exception as e:
+            print('can\'t format {} row {}: {}'.format(self._cur_row_num, self._cur_in_row, e))
+        finally:
+            self._work_book.close()
 
-    def change_cell_value(self, inn, kpp, new_inn='', new_kpp=''):
+
+    # изменить тип и значение
+    def _change_cell_value(self, inn, kpp, new_inn='', new_kpp=''):
         self._cur_out_row[inn].ctype = 1
         self._cur_out_row[inn].value = new_inn
         try:
@@ -96,36 +110,33 @@ class VATFormatter:
         except TypeError:
             pass
 
-    def correct_row(self, row):
-        self._cur_in_row = row
-        self._cur_out_row = copy.deepcopy(row)
-        for inn in self._inn_kpp:
+    # подправить одну строку
+    def correct_row(self):
+        self._cur_out_row = copy.deepcopy(self._cur_in_row)
+        for inn, kpp in self._inn_kpp.items():
+            new_inn = self._cur_in_row[inn].value
+            new_kpp = self._cur_in_row[kpp].value if kpp else ''
             try:
-                kpp = self._inn_kpp[inn]
                 if kpp:
-                    try:
-                        new_inn, new_kpp = self.reformat_cells_kpp_info(inn, kpp)
-                    except Exception as e:
-                        self.change_cell_value(inn, kpp)
-                        raise Exception('can\'t format row {} in {}, {} columns : {}'
-                                        .format(self._cur_in_row, inn, kpp, e))
+                    new_inn, new_kpp = self.reformat_cells_kpp_info(inn, kpp)
                 else:
-                    try:
-                        new_inn = self._reformat_cells_kpp_none(inn)
-                    except Exception as e:
-                        self.change_cell_value(inn, kpp)
-                        raise Exception('can\'t format row {} in {} column : {}'.format(self._cur_in_row, inn, e))
+                    new_inn, new_kpp = self._reformat_cells_kpp_none(inn)
+                if not self.check_inn(new_inn):
+                    raise ValueError('Wrong VAT in {} row'.format(self._cur_row_num + 1))
+            except ValueError as e:
+                raise ValueError('can\'t format {} row {}: {}'.format(self._cur_row_num, self._cur_in_row, e))
+            finally:
+                self._change_cell_value(inn, kpp, new_inn, new_kpp)
 
-                if self.check_inn(new_inn):
-                    self.change_cell_value(inn, kpp, new_inn, new_kpp)
-                else:
-                    self.change_cell_value(inn, kpp)
-                    print('Wrong VAT in {} row'.format(self._cur_row_num + 1))
-            except Exception as e:
-                print('{} in row {}'.format(e, self._cur_row_num + 1))
 
-    def write_corected_row(self):
-        self._outsheet.write_row('A{}'.format(self._cur_row_num + 1), [str(cell.value) for cell in self._cur_out_row])
+    # добавить изменённую строку в результат. Пока всё преобразуется к строковому типу без форматирования
+    def write_corected_row(self, error):
+        start_cell = 'A{}'.format(self._cur_row_num + 1)
+        row_values = [str(cell.value) for cell in self._cur_out_row]
+        format = self._work_book.add_format({'bold': True, 'font_color': 'red'}) \
+            if error else self._work_book.add_format({'bold': False, 'font_color': 'black'})
+        self._outsheet.set_column(0, len(row_values), 15)
+        self._outsheet.write_row(start_cell, row_values, format)
         self._cur_row_num += 1
 
     def add_prefix_to_column(self, col_num, prefix):
