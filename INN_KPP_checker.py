@@ -19,20 +19,28 @@ def argument_parse():
                         help='Номера столбцов, в которых есть КПП.\n'
                              'Номера столбцов указывать соответствующие номерам столбцов с ИНН')
 
-    args = parser.parse_args()
-    return args.filename[0], args.outputFileName, args.inn, args.kpp
+    args = parser.parse_known_args()
+    args, er = args[0], args[1]
+    return (args.filename[0], args.outputFileName, args.inn, args.kpp), er
+
+
+def correcting(ifn, inns, kpps, ofn):
+    try:
+        formatter = VATFormatter.VATFormatter(ifn, inns, kpps, ofn)
+        formatter.correct_type_of_vat()
+    except Exception as e:
+        print(e)
+
+def gui():
+    pass
 
 
 def main():
-    app = QApplication([])
-    wid = QWidget()
-    wid.resize(300, 300)
-    wid.show()
-    filename, output_file, inns, kpps = argument_parse()
-    print(filename, output_file, inns, kpps)
-    formatter = VATFormatter.VATFormatter(filename, inns, kpps, output_file)
-    formatter.correct_type_of_vat()
-    sys.exit(app.exec_())
+    (filename, output_file, inns, kpps), er = argument_parse()
+    gui() if er else correcting(filename, inns, kpps, output_file)
+
+    #formatter = VATFormatter.VATFormatter(filename, inns, kpps, output_file)
+    #formatter.correct_type_of_vat()
 
 
 if __name__ == '__main__':

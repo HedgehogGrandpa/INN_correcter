@@ -1,6 +1,8 @@
 import xlrd
 import xlsxwriter
 import copy
+import os.path as path
+import sys
 
 
 class VATFormatter:
@@ -23,19 +25,21 @@ class VATFormatter:
             inn_kpp = {i: k for i, k in zip(inn_list, kpp_list)}
             return inn_kpp
 
-        self._input_file_name = ifn
-        try:
-            self._output_file_name = generate_output_filename(ofn)
-            self._inn_kpp = generate_inn_kpp_dict(inns, kpps)
-            self._sheet = xlrd.open_workbook(self._input_file_name).sheet_by_index(0)
-            self._work_book = xlsxwriter.Workbook(self._output_file_name)
-            self._outsheet = self._work_book.add_worksheet('Corrected')
-            print(self._inn_kpp)
-        except Exception as e:
-            print(e)
+        def check_input_file(fn):
+            if path.isfile(fn):
+                return fn
+            else:
+                raise AttributeError('Input file {} does not exist'.format(fn))
+
         self._cur_row_num = 0
         self._cur_in_row = None
         self._cur_out_row = None
+        self._input_file_name = check_input_file(ifn)
+        self._output_file_name = generate_output_filename(ofn)
+        self._inn_kpp = generate_inn_kpp_dict(inns, kpps)
+        self._sheet = xlrd.open_workbook(self._input_file_name).sheet_by_index(0)
+        self._work_book = xlsxwriter.Workbook(self._output_file_name)
+        self._outsheet = self._work_book.add_worksheet('Corrected')
 
     # проверка корректности ИНН
     @staticmethod
@@ -90,13 +94,10 @@ class VATFormatter:
                 except ValueError as e:
                     print('{}'.format(e))
                     self.write_corected_row(True)
-        except PermissionError as e:
-            print('{}'.format(e))
         except Exception as e:
-            print('can\'t format {} row {}: {}'.format(self._cur_row_num, self._cur_in_row, e))
+            raise Exception('can\'t format {} row {}: {}'.format(self._cur_row_num, self._cur_in_row, e))
         finally:
             self._work_book.close()
-
 
     # изменить тип и значение
     def _change_cell_value(self, inn, kpp, new_inn='', new_kpp=''):
@@ -128,15 +129,14 @@ class VATFormatter:
             finally:
                 self._change_cell_value(inn, kpp, new_inn, new_kpp)
 
-
     # добавить изменённую строку в результат. Пока всё преобразуется к строковому типу без форматирования
     def write_corected_row(self, error):
         start_cell = 'A{}'.format(self._cur_row_num + 1)
         row_values = [str(cell.value) for cell in self._cur_out_row]
-        format = self._work_book.add_format({'bold': True, 'font_color': 'red'}) \
+        row_format = self._work_book.add_format({'bold': True, 'font_color': 'red'}) \
             if error else self._work_book.add_format({'bold': False, 'font_color': 'black'})
         self._outsheet.set_column(0, len(row_values), 15)
-        self._outsheet.write_row(start_cell, row_values, format)
+        self._outsheet.write_row(start_cell, row_values, row_format)
         self._cur_row_num += 1
 
     def add_prefix_to_column(self, col_num, prefix):
