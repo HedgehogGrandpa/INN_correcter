@@ -19,15 +19,20 @@ def argument_parse():
     parser.add_argument('-n', metavar='name_column', dest='name', nargs='*', action='store', type=int,
                         help='Номера столбцов, используемых для формирования имени выходных файлов для КА\n'
                              'столбцы будут скопированы и приписаны справа')
+    parser.add_argument('-p', metavar='prefix', dest='pre', nargs='*', action='store', type=str,
+                        help='Номера столбцов и префиксы для добавления.\n'
+                             'Задавать в порядке <Номер_столбца1> <Префикс1> <Номер_столбца2> <Прификс2> ...')
+    parser.add_argument('-s', metavar='suffix', dest='suf', nargs='*', action='store', type=str,
+                        help='Номера столбцов и суффиксы для добавления.\n'
+                             'Задавать в порядке <Номер_столбца1> <Суффикс1> <Номер_столбца2> <Суффикс2> ...')
 
     args = parser.parse_args()
-    return args.filename[0], args.outputFileName, args.inn, args.kpp, args.name
+    return args.filename[0], args.outputFileName, args.inn, args.kpp, args.name, args.pre, args.suf
 
 
-def correcting(ifn, inns, kpps, ofn, name):
-    formatter = VATFormatter.VATFormatter(ifn, inns, kpps, ofn, name)
-    formatter.correct_type_of_vat()
-
+def correcting(ifn, inns, kpps, ofn, name, pre, suf):
+    formatter = VATFormatter.VATFormatter(ifn, inns, kpps, ofn, name, pre, suf)
+    formatter.correct_vat()
 
 
 def gui():
@@ -35,8 +40,10 @@ def gui():
 
 
 def main():
-    filename, output_file, inns, kpps, name = argument_parse()
-    correcting(filename, inns, kpps, output_file, name)
+    filename, output_file, inns, kpps, name, pre, suf = argument_parse()
+    # correcting(filename, inns, kpps, output_file, name, pre, suf)
+    formatter = VATFormatter.VATFormatter(filename, inns, kpps, output_file, name, pre, suf)
+    formatter.correct_vat()
 
 
 if __name__ == '__main__':

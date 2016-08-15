@@ -5,7 +5,7 @@ import os.path as path
 
 
 class VATFormatter:
-    def __init__(self, ifn, inns, kpps=None, ofn='', names=None):
+    def __init__(self, ifn, inns, kpps=None, ofn='', names=None, prefix=None, suffix=None):
         """
         Object that check values in .xlsx file with VAT of organisations
         :param ifn: Name of file with organisations VAT and name\n
@@ -15,6 +15,10 @@ class VATFormatter:
         :param names: List of column numbers
         """
 
+        if suffix is None:
+            suffix = []
+        if prefix is None:
+            prefix = []
         if names is None:
             names = []
 
@@ -62,7 +66,7 @@ class VATFormatter:
 
         self._names = names
         self._cur_row_num = 0
-        self._cur_in_row = None
+        self._cur_in_values = None
         self._cur_out_values = None
         self._input_file_name = check_input_file(ifn)
         self._output_file_name = generate_output_filename(ofn)
@@ -70,6 +74,8 @@ class VATFormatter:
         self._sheet = xlrd.open_workbook(self._input_file_name).sheet_by_index(0)
         self._work_book = xlsxwriter.Workbook(self._output_file_name)
         self._outsheet = self._work_book.add_worksheet('Corrected')
+        self._prefix = {int(x): y for x, y in zip(*[iter(prefix)] * 2)}
+        self._suffix = {int(x): y for x, y in zip(*[iter(suffix)] * 2)}
 
     @staticmethod
     def check_inn(inn):
@@ -99,8 +105,8 @@ class VATFormatter:
         :param kpp_clmn: number of CIO column\n
         :return: new string values of VAT and CIO
         """
-        kpp_value = self._cur_in_row[kpp_clmn].value
-        inn_value = self._cur_in_row[inn_clmn].value
+        kpp_value = self._cur_in_values[kpp_clmn].value
+        inn_value = self._cur_in_values[inn_clmn].value
         # TODO если указан КПП, то длина ИНН не должна превышать 10
         if kpp_value:
             new_inn = '{:0>10}'.format(int(inn_value))
@@ -119,14 +125,14 @@ class VATFormatter:
         :param inn: number of VAT column\n
         :return: new string values of VAT
         """
-        inn_value = str(int(self._cur_in_row[inn].value))
+        inn_value = str(int(self._cur_in_values[inn].value))
         l = len(inn_value)
         if l in (9, 11):
             return '0{}'.format(inn_value), ''
         else:
             return inn_value, ''
 
-    def correct_type_of_vat(self):
+    def correct_vat(self):
         """
         correct values and types all over the work sheet\n
         call function correct_row for every row in sheet\n
@@ -134,15 +140,23 @@ class VATFormatter:
         :raise: Exception if something went wrong
         """
         try:
-            for self._cur_in_row in self._sheet.get_rows():
+            for self._cur_in_values in self._sheet.get_rows():
+                error = False
                 try:
                     self.correct_types_in_row()
-                    self.write_corected_row(False)
                 except ValueError as e:
                     print('{}'.format(e))
-                    self.write_corected_row(True)
+                    error = True
+                finally:
+                    if self._names:
+                        self._add_cells_in_row_without_spec()
+                    if self._prefix:
+                        self._add_cells_in_row_with_prefix()
+                    if self._suffix:
+                        self._add_cells_in_row_with_suffix()
+                    self.write_corected_row(error)
         except Exception as e:
-            raise Exception('can\'t format {} row {}: {}'.format(self._cur_row_num, self._cur_in_row, e))
+            raise Exception('can\'t format {} row {}: {}'.format(self._cur_row_num, self._cur_in_values, e))
         finally:
             self._work_book.close()
 
@@ -166,10 +180,10 @@ class VATFormatter:
         generate corrected row. Generate new VAT and CIO value, change types of cells to string\n
         :raise: ValueError if VAT is incorrect or inappropriate argument value (of correct type)
         """
-        self._cur_out_values = copy.deepcopy(self._cur_in_row)
+        self._cur_out_values = copy.deepcopy(self._cur_in_values)
         for inn_clmn, kpp_clmn in self._inn_kpp.items():
-            new_inn = self._cur_in_row[inn_clmn].value
-            new_kpp = self._cur_in_row[kpp_clmn].value if kpp_clmn else ''
+            new_inn = self._cur_in_values[inn_clmn].value
+            new_kpp = self._cur_in_values[kpp_clmn].value if kpp_clmn else ''
             try:
                 if kpp_clmn:
                     new_inn, new_kpp = self.reformat_cells_kpp_info(inn_clmn, kpp_clmn)
@@ -178,7 +192,7 @@ class VATFormatter:
                 if not self.check_inn(new_inn):
                     raise ValueError('Wrong VAT in {} row'.format(self._cur_row_num + 1))
             except ValueError as e:
-                raise ValueError('can\'t format {} row {}: {}'.format(self._cur_row_num, self._cur_in_row, e))
+                raise ValueError('can\'t format {} row {}: {}'.format(self._cur_row_num, self._cur_in_values, e))
             finally:
                 self._change_cell_value(inn_clmn, kpp_clmn, new_inn, new_kpp)
 
@@ -195,21 +209,38 @@ class VATFormatter:
         self._outsheet.write_row(start_cell, row_values, row_format)
         self._cur_row_num += 1
 
-    def add_prefix_to_column(self, col_num, prefix):
-        self._cur_out_values[col_num].ctype = 1
-        self._cur_out_values[col_num].value = '{}{}'.format(prefix, self._cur_out_values[col_num].value)
+    def _add_cells_in_row_with_prefix(self):
+        def _add_cell_in_row_with_prefix(col_from, prefix):
+            new_cell = copy.deepcopy(self._cur_in_values[col_from])
+            new_cell.ctype = 1
+            new_cell.value = '{}{}'.format(prefix, new_cell.value)
+            self._cur_out_values.append(new_cell)
 
-    def add_postfix_to_column(self, col_num, postfix):
-        self._cur_out_values[col_num].ctype = 1
-        self._cur_out_values[col_num].value = '{}{}'.format(self._cur_out_values[col_num].value, postfix)
+        for col in self._prefix:
+            _add_cell_in_row_with_prefix(col, self._prefix[col])
 
-    def copy_column_without_spec(self, col_from):
-        """
-        Copy cell value which will be used in names of output files into the end of row.
-        Chars that can't used in filename removed from new cell value
-        :param col_from: number of column with value to copy
-        """
-        new_cell = copy.deepcopy(self._cur_out_values[col_from])
-        new_cell.ctype = 1
-        new_cell.value.translate(str.maketrans('', '', '?/\\<>,|*:"'))
-        self._cur_out_values.append(new_cell)
+    def _add_cells_in_row_with_suffix(self):
+        def _add_cell_in_row_with_prefix(col_from, suffix):
+            new_cell = copy.deepcopy(self._cur_in_values[col_from])
+            new_cell.ctype = 1
+            new_cell.value = '{}{}'.format(suffix, new_cell.value)
+            self._cur_out_values.append(new_cell)
+
+        for col in self._suffix:
+            _add_cell_in_row_with_prefix(col, self._suffix[col])
+
+    def _add_cells_in_row_without_spec(self):
+        def _add_cell_in_row_without_spec(col_from):
+            """
+            Copy cell value which will be used in names of output files into the end of row.
+            Chars that can't used in filename removed from new cell value
+            :param col_from: number of column with value to copy
+            """
+            new_cell = copy.deepcopy(self._cur_in_values[col_from])
+            new_cell.ctype = 1
+            new_cell.value.translate(str.maketrans('', '', '?/\\<>,|*:"'))
+            self._cur_out_values.append(new_cell)
+
+        for name in self._names:
+            _add_cell_in_row_without_spec(name)
+
