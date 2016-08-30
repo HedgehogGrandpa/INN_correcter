@@ -144,16 +144,16 @@ class VATFormatter:
                 error = False
                 try:
                     self.correct_types_in_row()
-                except ValueError as e:
-                    print('{}'.format(e))
-                    error = True
-                finally:
                     if self._names:
                         self._add_cells_in_row_without_spec()
                     if self._prefix:
                         self._add_cells_in_row_with_prefix()
                     if self._suffix:
                         self._add_cells_in_row_with_suffix()
+                except ValueError as e:
+                    print('{}'.format(e))
+                    error = True
+                finally:
                     self.write_corected_row(error)
         except Exception as e:
             raise Exception('can\'t format {} row {}: {}'.format(self._cur_row_num, self._cur_in_values, e))
