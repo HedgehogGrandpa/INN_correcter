@@ -27,14 +27,12 @@ def argument_parse():
                              'Задавать в порядке <Номер_столбца1> <Суффикс1> <Номер_столбца2> <Суффикс2> ...')
 
     args = parser.parse_args()
-
     return args.filename[0], args.outputFileName, args.inn, args.kpp, args.name, args.pre, args.suf
 
 
 def correcting(ifn, inns, kpps, ofn, name, pre, suf):
     formatter = VATFormatter.VATFormatter(ifn, inns, kpps, ofn, name, pre, suf)
     formatter.correct_vat()
-    # TODO добавить логирование
 
 
 def gui():
