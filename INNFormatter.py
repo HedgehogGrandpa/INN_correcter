@@ -138,7 +138,7 @@ class INNFormatter:
         after work close output .xlsx file
         :raise: Exception if something went wrong
         """
-        with open('logs.txt', mode='w') as log:
+        with open('logs.txt', mode='w') as log, open('INNerrors.txt', mode='w') as err:
             try:
                 log.write('"{}" OPEN\n'.format(self._output_file_name))
                 for self._cur_in_values in self._sheet.get_rows():
@@ -163,6 +163,7 @@ class INNFormatter:
                     except ValueError as e:
                         error = True
                         log.write('{}\n'.format(e))
+                        err.write('{}:\t{}\n'.format(self._cur_row_num, e))
                     finally:
                         self._write_corected_row(error)
                         log.write('end handle {} row\n'.format(self._cur_row_num))
