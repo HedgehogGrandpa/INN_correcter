@@ -97,7 +97,7 @@ class INNFormatter:
         else:
             return inn[-2:] == inn_csum(inn[:-2]) + inn_csum(inn[:-1])
 
-    def reformat_cells_kpp_info(self, inn_clmn, kpp_clmn):
+    def _reformat_cells_kpp_info(self, inn_clmn, kpp_clmn):
         """
         generated corrected values of INN and CIO if have information about location of CIO in sheet\n
         :param inn_clmn: number of INN column\n
@@ -142,7 +142,7 @@ class INNFormatter:
             for self._cur_in_values in self._sheet.get_rows():
                 error = False
                 try:
-                    self.correct_types_in_row()
+                    self._correct_types_in_row()
                     if self._names:
                         self._add_cells_in_row_without_spec()
                     if self._prefix:
@@ -152,7 +152,7 @@ class INNFormatter:
                 except ValueError:
                     error = True
                 finally:
-                    self.write_corected_row(error)
+                    self._write_corected_row(error)
         except Exception as e:
             raise Exception('can\'t format {} row {}: {}'.format(self._cur_row_num, self._cur_in_values, e))
         finally:
@@ -173,7 +173,7 @@ class INNFormatter:
             self._cur_out_values[kpp_clmn].ctype = 1
             self._cur_out_values[kpp_clmn].value = new_kpp
 
-    def correct_types_in_row(self):
+    def _correct_types_in_row(self):
         """
         generate corrected row. Generate new INN and CIO value, change types of cells to string\n
         :raise: ValueError if INN is incorrect or inappropriate argument value (of correct type)
@@ -184,7 +184,7 @@ class INNFormatter:
             new_kpp = self._cur_in_values[kpp_clmn].value if kpp_clmn else ''
             try:
                 if kpp_clmn:
-                    new_inn, new_kpp = self.reformat_cells_kpp_info(inn_clmn, kpp_clmn)
+                    new_inn, new_kpp = self._reformat_cells_kpp_info(inn_clmn, kpp_clmn)
                 else:
                     new_inn, new_kpp = self._reformat_cells_kpp_none(inn_clmn)
                 if not self.check_inn(new_inn):
@@ -194,7 +194,7 @@ class INNFormatter:
             finally:
                 self._change_cell_value(inn_clmn, kpp_clmn, new_inn, new_kpp)
 
-    def write_corected_row(self, error):
+    def _write_corected_row(self, error):
         """
         Add corrected row in result sheet. Row with error writen red in output file\n
         :param error: whether or not there an error in row
