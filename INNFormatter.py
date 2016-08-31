@@ -138,7 +138,7 @@ class INNFormatter:
         after work close output .xlsx file
         :raise: Exception if something went wrong
         """
-        with open('logs.txt', mode='w') as log, open('INNerrors.txt', mode='w') as err:
+        with open('logs.txt', mode='w') as log, open('INN_errors.txt', mode='w') as err:
             try:
                 log.write('"{}" OPEN\n'.format(self._output_file_name))
                 for self._cur_in_values in self._sheet.get_rows():
@@ -163,12 +163,12 @@ class INNFormatter:
                     except ValueError as e:
                         error = True
                         log.write('{}\n'.format(e))
-                        err.write('{}:\t{}\n'.format(self._cur_row_num, e))
+                        err.write('{:>5}:\t{}\n'.format(self._cur_row_num + 1, e))
                     finally:
                         self._write_corected_row(error)
-                        log.write('end handle {} row\n'.format(self._cur_row_num))
+                        log.write('end handle {} row\n'.format(self._cur_row_num + 1))
             except Exception as e:
-                log.write('can\'t format {} row {}: {}\n'.format(self._cur_row_num, self._cur_in_values, e))
+                log.write('can\'t format {} row {}: {}\n'.format(self._cur_row_num + 1, self._cur_in_values, e))
             finally:
                 self._work_book.close()
                 log.write('\n\n"{}" CLOSE\n'.format(self._output_file_name))
@@ -203,7 +203,8 @@ class INNFormatter:
                 else:
                     new_inn, new_kpp = self._reformat_cells_kpp_none(inn_clmn)
                 if not self.check_inn(new_inn):
-                    raise ValueError('Wrong INN checksum in {} row: {}\n'.format(self._cur_row_num + 1, new_inn))
+                    raise ValueError('Wrong INN checksum in {} row: {}\n'
+                                     'formatting INN-KPP end\n'.format(self._cur_row_num + 1, new_inn))
             finally:
                 self._change_cell_value(inn_clmn, kpp_clmn, new_inn, new_kpp)
 
