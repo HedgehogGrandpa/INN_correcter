@@ -138,25 +138,39 @@ class INNFormatter:
         after work close output .xlsx file
         :raise: Exception if something went wrong
         """
-        try:
-            for self._cur_in_values in self._sheet.get_rows():
-                error = False
-                try:
-                    self._correct_types_in_row()
-                    if self._names:
-                        self._add_cells_in_row_without_spec()
-                    if self._prefix:
-                        self._add_cells_in_row_with_prefix()
-                    if self._suffix:
-                        self._add_cells_in_row_with_suffix()
-                except ValueError:
-                    error = True
-                finally:
-                    self._write_corected_row(error)
-        except Exception as e:
-            raise Exception('can\'t format {} row {}: {}'.format(self._cur_row_num, self._cur_in_values, e))
-        finally:
-            self._work_book.close()
+        with open('logs.txt', mode='w') as log:
+            try:
+                log.write('"{}" OPEN\n'.format(self._output_file_name))
+                for self._cur_in_values in self._sheet.get_rows():
+                    error = False
+                    try:
+                        log.write('\nstart handle {} row\n'.format(self._cur_row_num + 1))
+                        log.write('formatting INN-KPP start\n')
+                        self._correct_types_in_row()
+                        log.write('formatting INN-KPP end\n')
+                        if self._names:
+                            log.write('adding cells without special symbols start\n')
+                            self._add_cells_in_row_without_spec()
+                            log.write('adding cells without special symbols end\n')
+                        if self._prefix:
+                            log.write('adding cells with prefix start\n')
+                            self._add_cells_in_row_with_prefix()
+                            log.write('adding cells with prefix end\n')
+                        if self._suffix:
+                            log.write('adding cells with suffix start\n')
+                            self._add_cells_in_row_with_suffix()
+                            log.write('adding cells with suffix end\n')
+                    except ValueError as e:
+                        error = True
+                        log.write('{}\n'.format(e))
+                    finally:
+                        self._write_corected_row(error)
+                        log.write('end handle {} row\n'.format(self._cur_row_num))
+            except Exception as e:
+                log.write('can\'t format {} row {}: {}\n'.format(self._cur_row_num, self._cur_in_values, e))
+            finally:
+                self._work_book.close()
+                log.write('\n\n"{}" CLOSE\n'.format(self._output_file_name))
 
     def _change_cell_value(self, inn_clmn, kpp_clmn, new_inn, new_kpp=''):
         """
@@ -188,9 +202,7 @@ class INNFormatter:
                 else:
                     new_inn, new_kpp = self._reformat_cells_kpp_none(inn_clmn)
                 if not self.check_inn(new_inn):
-                    raise ValueError('Wrong INN in {} row'.format(self._cur_row_num + 1))
-            except ValueError as e:
-                raise ValueError('can\'t format {} row {}: {}'.format(self._cur_row_num, self._cur_in_values, e))
+                    raise ValueError('Wrong INN checksum in {} row: {}\n'.format(self._cur_row_num + 1, new_inn))
             finally:
                 self._change_cell_value(inn_clmn, kpp_clmn, new_inn, new_kpp)
 
@@ -242,6 +254,7 @@ class INNFormatter:
         for name in self._names:
             _add_cell_in_row_without_spec(name)
 
-# TODO добавить логгер. Перестать выводить всё в консоль
+# TODO переписать логгер с использованием декораторов и обернуть функции в этот декоратор
+# TODO добавить прогрессбар
 # TODO добавить возможность склеивания столбцов (а-ля join по ячейкам)
 # TODO сделать GUI
